@@ -2,7 +2,7 @@ import os
 import time
 import requests
 import html
-from flask import Flask, request, render_template_string, redirect, url_for, flash, session
+from flask import Flask, request, render_template_string, redirect, url_for, flash, session, send_from_directory
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "change-me-in-production")
@@ -13,10 +13,8 @@ TELEGRAM_CHAT_ID = "5244188429"
 PORT = int(os.environ.get("PORT", 5000))
 API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
-# Лимит: не чаще 1 сообщения в 10 секунд с одной сессии
 RATE_LIMIT_SECONDS = 10
 
-# HTML шаблон
 HTML = """
 <!DOCTYPE html>
 <html lang="ru">
@@ -24,6 +22,7 @@ HTML = """
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Сообщение Султану</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📩</text></svg>">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -114,7 +113,6 @@ HTML = """
 </html>
 """
 
-# Отправка сообщения в Telegram
 def send_to_telegram(text):
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
@@ -125,40 +123,43 @@ def send_to_telegram(text):
     r.raise_for_status()
     return r.json()
 
-@app.route("/", methods=["GET", "POST"])
-def index():
-    if request.method == "POST":
-        msg = request.form.get("message", "").strip()
-        
-        if not msg:
-            flash("Введите текст сообщения.", "error")
-            return redirect(url_for("index"))
-            
-        # Проверка лимита
-        last = session.get("last_sent_at", 0)
-        now = time.time()
-        if now - last < RATE_LIMIT_SECONDS:
-            wait = int(RATE_LIMIT_SECONDS - (now - last))
-            flash(f"Подождите {wait} сек. перед повторной отправкой.", "warning")
-            return redirect(url_for("index"))
-            
-        session["last_sent_at"] = now
-        
-        # Безопасность: экранируем HTML и обрезаем
-        safe_text = html.escape(msg)[:2000]
-        final_text = f"📩 <b>Анонимное сообщение:</b>\n\n{safe_text}"
-        
-        try:
-            send_to_telegram(final_text)
-            flash("Сообщение успешно отправлено!", "success")
-        except Exception as e:
-            print(f"Ошибка Telegram: {e}")
-            flash("Ошибка при отправке. Попробуйте позже.", "error")
-            
-        return redirect(url_for("index"))
-        
+@app.route("/")
+def index_get():
     return render_template_string(HTML)
+
+@app.route("/", methods=["POST"])
+def index_post():
+    msg = request.form.get("message", "").strip()
+    
+    if not msg:
+        flash("Введите текст сообщения.", "error")
+        return redirect(url_for("index_get"))
+        
+    last = session.get("last_sent_at", 0)
+    now = time.time()
+    if now - last < RATE_LIMIT_SECONDS:
+        wait = int(RATE_LIMIT_SECONDS - (now - last))
+        flash(f"Подождите {wait} сек. перед повторной отправкой.", "warning")
+        return redirect(url_for("index_get"))
+        
+    session["last_sent_at"] = now
+    safe_text = html.escape(msg)[:2000]
+    final_text = f"📩 <b>Анонимное сообщение:</b>\n\n{safe_text}"
+    
+    try:
+        send_to_telegram(final_text)
+        flash("Сообщение успешно отправлено!", "success")
+    except Exception as e:
+        print(f"Ошибка Telegram: {e}")
+        flash("Ошибка при отправке. Попробуйте позже.", "error")
+        
+    return redirect(url_for("index_get"))
+
+@app.route("/favicon.ico")
+def favicon():
+    return "", 204
 
 if __name__ == "__main__":
     print(f"🌐 Сервер запущен: http://0.0.0.0:{PORT}")
-    app.run(host="0.0.0.0", port=PORT)
+    print("Открой браузер и перейди по адресу выше")
+    app.run(host="0.0.0.0", port=PORT, debug=True)
