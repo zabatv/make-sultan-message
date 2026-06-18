@@ -2,15 +2,13 @@ import os
 import time
 import requests
 import html
-from flask import Flask, request, render_template_string, redirect, url_for, flash, session, send_from_directory
+from flask import Flask, request, render_template_string, redirect, url_for, flash, session
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET", "change-me-in-production")
 
-# Настройки Telegram
 TELEGRAM_TOKEN = "8978439642:AAGSjQOggCU-C8_fP6Qj7QAEBvuCsgkGoRk"
 TELEGRAM_CHAT_ID = "5244188429"
-PORT = int(os.environ.get("PORT", 5000))
 API_URL = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}"
 
 RATE_LIMIT_SECONDS = 10
@@ -160,6 +158,5 @@ def favicon():
     return "", 204
 
 if __name__ == "__main__":
-    print(f"🌐 Сервер запущен: http://0.0.0.0:{PORT}")
-    print("Открой браузер и перейди по адресу выше")
-    app.run(host="0.0.0.0", port=PORT, debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
